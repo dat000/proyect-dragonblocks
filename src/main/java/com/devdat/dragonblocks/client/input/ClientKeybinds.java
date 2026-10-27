@@ -20,8 +20,17 @@ public class ClientKeybinds {
             CATEGORY_DRAGONBLOCKS
     );
 
+    // NUEVA: Tecla para cargar Ki (por defecto la 'C')
+    public static final KeyMapping CHARGE_KI_KEY = new KeyMapping(
+            "key.dragonblocks.charge_ki",
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_C,
+            CATEGORY_DRAGONBLOCKS
+    );
+
     @SubscribeEvent
     public static void registerKeyMappings(RegisterKeyMappingsEvent event) {
         event.register(LOCK_KEY);
+        event.register(CHARGE_KI_KEY);
     }
 }

@@ -1,5 +1,6 @@
 package com.devdat.dragonblocks;
 
+import com.devdat.dragonblocks.network.ModMessages;
 import com.mojang.logging.LogUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.registries.Registries;
@@ -86,8 +87,11 @@ public class DragonBlocks
 
     private void commonSetup(final FMLCommonSetupEvent event)
     {
-        // Some common setup code
-        LOGGER.info("HELLO FROM COMMON SETUP");
+        event.enqueueWork(() -> {
+            ModMessages.register();
+        });
+
+        LOGGER.info("INICIALIZACIÓN: Preparando sistemas de Proyect Dragon Blocks...");
 
         if (Config.logDirtBlock)
             LOGGER.info("DIRT BLOCK >> {}", ForgeRegistries.BLOCKS.getKey(Blocks.DIRT));

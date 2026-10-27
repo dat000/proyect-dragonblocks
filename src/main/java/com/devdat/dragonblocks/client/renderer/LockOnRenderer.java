@@ -3,6 +3,7 @@ package com.devdat.dragonblocks.client.renderer;
 import com.devdat.dragonblocks.client.input.LockOnManager;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.math.Axis;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -26,7 +27,7 @@ public class LockOnRenderer {
             Minecraft mc = Minecraft.getInstance();
             LivingEntity target = LockOnManager.getLockedTarget();
 
-            if (target == null || mc.player == null) return;
+            if (target == null || mc.player == null || mc.level == null) return;
 
             PoseStack poseStack = event.getPoseStack();
             poseStack.pushPose();
@@ -34,24 +35,26 @@ public class LockOnRenderer {
             Camera camera = mc.gameRenderer.getMainCamera();
             Vec3 camPos = camera.getPosition();
 
-            // Posición interpolada del objetivo (centrado más arriba, sobre la cabeza)
+            // Posición interpolada del objetivo (sobre la cabeza)
             double partialTicks = event.getPartialTick();
             double x = target.xo + (target.getX() - target.xo) * partialTicks - camPos.x;
-            double y = target.yo + (target.getY() - target.yo) * partialTicks + (target.getBbHeight() * 0.5D) - camPos.y; // Subido un poco más para que flote limpio
+            double y = target.yo + (target.getY() - target.yo) * partialTicks + (target.getBbHeight() * 0.5D) - camPos.y;
             double z = target.zo + (target.getZ() - target.zo) * partialTicks - camPos.z;
 
             poseStack.translate(x, y, z);
 
-            // Efecto Billboard: El sprite rota automáticamente para mirar siempre a la cámara
+            // 1. Efecto Billboard: El sprite rota para mirar siempre a la cámara
             poseStack.mulPose(camera.rotation());
+
+            // 2. Rotación dinámica sobre su propio eje (Z) para darle efecto giratorio animado
+            float spinAngle = (mc.level.getGameTime() + (float) partialTicks) * 3.0f; // Multiplicador de velocidad de giro
+            poseStack.mulPose(Axis.ZP.rotationDegrees(spinAngle));
 
             // Escala del sprite en el mundo
             float scale = 0.6f;
             poseStack.scale(-scale, -scale, scale);
 
             MultiBufferSource.BufferSource bufferSource = mc.renderBuffers().bufferSource();
-
-            // USAMOS textSeeThrough PARA QUE SE RENDERICE SIEMPRE POR ENCIMA DE TODO
             VertexConsumer vertexConsumer = bufferSource.getBuffer(RenderType.textSeeThrough(LOCK_TEXTURE));
 
             Matrix4f matrix4f = poseStack.last().pose();

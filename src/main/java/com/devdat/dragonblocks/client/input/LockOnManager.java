@@ -6,6 +6,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.client.event.ViewportEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -27,7 +28,7 @@ public class LockOnManager {
             Minecraft mc = Minecraft.getInstance();
             if (mc.player == null || mc.level == null) return;
 
-            // Manejo de la tecla para activar/desactivar
+            // Manejo de la tecla central para activar/desactivar el lock-on
             while (ClientKeybinds.LOCK_KEY.consumeClick()) {
                 if (lockedTarget != null) {
                     lockedTarget = null;
@@ -46,12 +47,46 @@ public class LockOnManager {
                 }
             }
 
-            // Validar si el objetivo sigue vivo o se alejó demasiado
+            // Validar si el objetivo actual sigue vivo o se alejó demasiado (> 20 bloques)
             if (lockedTarget != null) {
                 if (!lockedTarget.isAlive() || lockedTarget.distanceToSqr(mc.player) > 400.0D) {
                     lockedTarget = null;
                     initializedAngles = false;
                     mc.player.sendSystemMessage(Component.literal("§c[Lock-on] Objetivo perdido"));
+                }
+            }
+        }
+    }
+
+    @SubscribeEvent
+    public static void onMouseScroll(InputEvent.MouseScrollingEvent event) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null || mc.level == null) return;
+
+        // Si tenemos un objetivo fijado, usamos la rueda del ratón para alternar entre blancos
+        if (lockedTarget != null) {
+            double delta = event.getScrollDelta();
+            if (delta != 0) {
+                List<LivingEntity> targets = getAvailableTargets(mc);
+                if (targets.size() > 1) {
+                    int currentIndex = targets.indexOf(lockedTarget);
+                    if (currentIndex == -1) {
+                        currentIndex = 0;
+                    }
+
+                    if (delta > 0) {
+                        // Rueda hacia arriba: Siguiente objetivo en la lista
+                        currentIndex = (currentIndex + 1) % targets.size();
+                    } else {
+                        // Rueda hacia abajo: Objetivo anterior en la lista
+                        currentIndex = (currentIndex - 1 + targets.size()) % targets.size();
+                    }
+
+                    lockedTarget = targets.get(currentIndex);
+                    mc.player.sendSystemMessage(Component.literal("§a[Lock-on] Cambiado a: " + lockedTarget.getName().getString()));
+
+                    // Cancelamos el evento de scroll para evitar cambiar de ítem en la hotbar por accidente
+                    event.setCanceled(true);
                 }
             }
         }
@@ -68,11 +103,11 @@ public class LockOnManager {
             initializedAngles = true;
         }
 
-        // Obtenemos el tick parcial para lograr fluidez a nivel de fotogramas (FPS)
+        // Obtenemos el tick parcial para lograr total fluidez visual por fotograma (FPS)
         double partialTick = event.getPartialTick();
         Vec3 playerEyes = mc.player.getEyePosition((float) partialTick);
 
-        // Posición interpolada del objetivo para evitar saltos
+        // Posición interpolada del objetivo para evitar saltos bruscos
         double targetX = lockedTarget.xo + (lockedTarget.getX() - lockedTarget.xo) * partialTick;
         double targetY = lockedTarget.yo + (lockedTarget.getY() - lockedTarget.yo) * partialTick + lockedTarget.getEyeHeight() * 0.5D;
         double targetZ = lockedTarget.zo + (lockedTarget.getZ() - lockedTarget.zo) * partialTick;
@@ -85,7 +120,7 @@ public class LockOnManager {
         float targetYaw = (float) (Math.atan2(dZ, dX) * (180 / Math.PI)) - 90.0F;
         float targetPitch = (float) (-(Math.atan2(dY, distanceXZ) * (180 / Math.PI)));
 
-        // Suavizado frame-rate independent
+        // Aplicamos suavizado independiente de los FPS
         currentYaw = lerpAngle(currentYaw, targetYaw, 0.25f);
         currentPitch = clamp(lerpAngle(currentPitch, targetPitch, 0.25f), -90.0F, 90.0F);
 
@@ -93,13 +128,18 @@ public class LockOnManager {
         event.setYaw(currentYaw);
         event.setPitch(currentPitch);
 
-        // Sincronizamos la rotación visual del jugador
+        // Sincronizamos la rotación visual del cuerpo y cabeza del jugador
         mc.player.setYRot(currentYaw);
         mc.player.setXRot(currentPitch);
         mc.player.yHeadRot = currentYaw;
     }
 
     private static LivingEntity findBestTarget(Minecraft mc) {
+        List<LivingEntity> targets = getAvailableTargets(mc);
+        return targets.isEmpty() ? null : targets.get(0);
+    }
+
+    private static List<LivingEntity> getAvailableTargets(Minecraft mc) {
         assert mc.player != null;
         assert mc.level != null;
 
@@ -107,9 +147,9 @@ public class LockOnManager {
         List<LivingEntity> entities = mc.level.getEntitiesOfClass(LivingEntity.class, searchBox,
                 entity -> entity != mc.player && entity.isAlive());
 
-        return entities.stream()
-                .min(Comparator.comparingDouble(e -> e.distanceToSqr(mc.player)))
-                .orElse(null);
+        // Ordenamos todos los blancos disponibles de más cercano a más lejano
+        entities.sort(Comparator.comparingDouble(e -> e.distanceToSqr(mc.player)));
+        return entities;
     }
 
     private static float lerpAngle(float current, float target, float factor) {

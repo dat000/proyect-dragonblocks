@@ -39,6 +39,13 @@ public class ModMessages {
                 .encoder(ChargeKiPacket::toBytes)
                 .consumerNetworkThread(ChargeKiPacket::handle)
                 .add();
+
+        // 3. Raza de un jugador hacia él y quienes lo ven (para el modelo GeckoLib)
+        net.messageBuilder(SyncRacePacket.class, id(), NetworkDirection.PLAY_TO_CLIENT)
+                .decoder(SyncRacePacket::new)
+                .encoder(SyncRacePacket::toBytes)
+                .consumerNetworkThread(SyncRacePacket::handle)
+                .add();
     }
 
     public static <T> void sendToServer(T message) {
@@ -47,6 +54,10 @@ public class ModMessages {
 
     public static <T> void sendToPlayer(T message, ServerPlayer player) {
         INSTANCE.send(PacketDistributor.PLAYER.with(() -> player), message);
+    }
+
+    public static <T> void sendToPlayerAndTrackers(T message, ServerPlayer player) {
+        INSTANCE.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> player), message);
     }
 
     public static <T> void sendToAllPlayers(T message) {

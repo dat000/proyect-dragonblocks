@@ -8,8 +8,8 @@ public class PlayerStats {
     private float stamina = 100.0f;
     private float maxStamina = 100.0f;
 
-    // 0: Humano, 1: Saiyajin, 2: Namekiano (según el GDD)
-    private int race = 0;
+    // -1: Vanilla (sin raza), 0: Humano, 1: Saiyajin, 2: Namekiano (según el GDD). Ver Race.
+    private int race = Race.VANILLA.getId();
 
     // 1: Infancia, 2: Adolescencia, 3: Adultez
     private int lifeStage = 1;
@@ -42,6 +42,13 @@ public class PlayerStats {
         setKi(this.ki + amount);
     }
 
+    // Copiar datos de otra instancia (al morir o cambiar de dimensión, PlayerEvent.Clone)
+    public void copyFrom(PlayerStats other) {
+        CompoundTag nbt = new CompoundTag();
+        other.saveNBTData(nbt);
+        loadNBTData(nbt);
+    }
+
     // Guardar datos en el disco (NBT)
     public void saveNBTData(CompoundTag nbt) {
         nbt.putFloat("Ki", ki);
@@ -59,7 +66,7 @@ public class PlayerStats {
         maxKi = nbt.getFloat("MaxKi");
         stamina = nbt.getFloat("Stamina");
         maxStamina = nbt.getFloat("MaxStamina");
-        race = nbt.getInt("Race");
+        race = nbt.contains("Race") ? nbt.getInt("Race") : Race.VANILLA.getId();
         lifeStage = nbt.getInt("LifeStage");
         isCharging = nbt.getBoolean("IsCharging"); // Cargamos el estado de carga
     }
